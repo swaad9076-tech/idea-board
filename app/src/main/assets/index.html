@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#1c1b19" />
+<title>دفتر الأفكار</title>
+<style>
+  :root{
+    --bg:#14130f;
+    --panel:#1e1c17;
+    --panel-2:#26231c;
+    --line:#332f26;
+    --ink:#f2ede2;
+    --muted:#a49b88;
+    --accent:#d9a441;
+    --accent-soft:#3a2f18;
+    --danger:#c2604f;
+    --ok:#7fa66a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink)}
+  body{
+    font-family:"Segoe UI",Tahoma,"Noto Naskh Arabic",system-ui,sans-serif;
+    font-size:16px;line-height:1.6;
+    padding:18px 14px calc(28px + env(safe-area-inset-bottom));
+    max-width:720px;margin:0 auto;
+  }
+  header{margin-bottom:18px}
+  h1{font-size:1.45rem;margin:0 0 4px;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:.85rem;margin:0}
+  .composer{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:16px}
+  textarea{
+    width:100%;min-height:88px;resize:vertical;background:var(--panel-2);
+    color:var(--ink);border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;font:inherit;outline:none;
+  }
+  textarea:focus{border-color:var(--accent)}
+  .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  select,button{font:inherit}
+  select{
+    background:var(--panel-2);color:var(--ink);border:1px solid var(--line);
+    border-radius:10px;padding:9px 10px;flex:1;min-width:120px;outline:none;
+  }
+  button{
+    background:var(--accent);color:#1c1608;border:0;border-radius:10px;
+    padding:10px 18px;font-weight:700;cursor:pointer;
+  }
+  button:active{transform:translateY(1px)}
+  button.ghost{
+    background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:600;
+  }
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .chip{
+    background:var(--panel);border:1px solid var(--line);color:var(--muted);
+    border-radius:999px;padding:6px 14px;cursor:pointer;font-size:.86rem;
+  }
+  .chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  input.search{
+    background:var(--panel);border:1px solid var(--line);color:var(--ink);
+    border-radius:999px;padding:7px 14px;font:inherit;font-size:.86rem;
+    outline:none;flex:1;min-width:140px;
+  }
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:13px 14px;margin-bottom:10px;
+  }
+  .card .text{white-space:pre-wrap;word-break:break-word;margin:0 0 8px}
+  .meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.78rem;color:var(--muted)}
+  .badge{padding:1px 9px;border-radius:999px;border:1px solid var(--line);font-size:.74rem}
+  .b-idea{color:var(--accent);border-color:var(--accent)}
+  .b-draft{color:#8fb3d9;border-color:#3a4b5c}
+  .b-done{color:var(--ok);border-color:#3d4f34}
+  .actions{margin-right:auto;display:flex;gap:6px}
+  .act{
+    background:transparent;border:1px solid var(--line);color:var(--muted);
+    border-radius:8px;padding:4px 10px;font-size:.76rem;font-weight:600;
+  }
+  .act.del:hover{color:var(--danger);border-color:var(--danger)}
+  .empty{color:var(--muted);text-align:center;padding:28px 10px;font-size:.9rem}
+  footer{margin-top:22px;color:var(--muted);font-size:.75rem;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>دفتر الأفكار</h1>
+  <p class="sub">أفكارك ومشاهدك في مكان واحد — تُحفظ على جهازك تلقائيًا</p>
+</header>
+
+<div class="composer">
+  <textarea id="input" placeholder="اكتبي الفكرة هنا… جملة أو سطر يكفي"></textarea>
+  <div class="row">
+    <select id="type">
+      <option value="idea">فكرة</option>
+      <option value="scene">مشهد</option>
+      <option value="quote">اقتباس</option>
+      <option value="research">بحث</option>
+    </select>
+    <button id="add">أضيفي</button>
+  </div>
+</div>
+
+<div class="toolbar" id="filters">
+  <span class="chip on" data-f="all">الكل</span>
+  <span class="chip" data-f="idea">أفكار</span>
+  <span class="chip" data-f="draft">قيد الكتابة</span>
+  <span class="chip" data-f="done">منشور</span>
+  <input class="search" id="search" placeholder="ابحثي…" />
+</div>
+
+<div id="list"></div>
+
+<footer>دفتر الأفكار — نسخة تجريبية</footer>
+
+<script>
+const KEY = "waad.ideas.v1";
+const TYPE_LABEL = { idea:"فكرة", scene:"مشهد", quote:"اقتباس", research:"بحث" };
+const STATUS_LABEL = { idea:"فكرة", draft:"قيد الكتابة", done:"منشور" };
+
+let items = [];
+let filter = "all";
+let query = "";
+
+function load(){
+  try { items = JSON.parse(localStorage.getItem(KEY) || "[]"); }
+  catch(e){ items = []; }
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(items)); }
+
+function fmtDate(ts){
+  const d = new Date(ts);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const time = d.toLocaleTimeString("ar", {hour:"2-digit", minute:"2-digit"});
+  if (sameDay) return "اليوم " + time;
+  return d.toLocaleDateString("ar", {day:"numeric", month:"short"}) + " · " + time;
+}
+
+function render(){
+  const list = document.getElementById("list");
+  let view = items.slice().sort((a,b)=>b.ts-a.ts);
+  if (filter === "idea") view = view.filter(x => x.status === "idea" && x.type !== "draft");
+  if (filter === "draft") view = view.filter(x => x.status === "draft");
+  if (filter === "done") view = view.filter(x => x.status === "done");
+  if (query) {
+    const q = query.trim();
+    view = view.filter(x => x.text.includes(q) || (TYPE_LABEL[x.type]||"").includes(q));
+  }
+  if (!view.length){
+    list.innerHTML = '<div class="empty">لا شيء هنا بعد — أول فكرة تكتبينها تظهر هنا.</div>';
+    return;
+  }
+  list.innerHTML = view.map(cardHTML).join("");
+}
+
+function cardHTML(x){
+  const st = STATUS_LABEL[x.status] || "فكرة";
+  const stCls = x.status === "draft" ? "b-draft" : x.status === "done" ? "b-done" : "b-idea";
+  const next = x.status === "idea"
+    ? `<button class="act" data-act="draft" data-id="${x.id}">قيد الكتابة</button>`
+    : x.status === "draft"
+      ? `<button class="act" data-act="done" data-id="${x.id}">تم النشر</button>`
+      : "";
+  return `<div class="card">
+    <p class="text">${escapeHTML(x.text)}</p>
+    <div class="meta">
+      <span class="badge ${stCls}">${st}</span>
+      <span class="badge">${TYPE_LABEL[x.type] || "فكرة"}</span>
+      <span>${fmtDate(x.ts)}</span>
+      <span class="actions">
+        ${next}
+        <button class="act del" data-act="del" data-id="${x.id}">حذف</button>
+      </span>
+    </div>
+  </div>`;
+}
+
+function escapeHTML(s){
+  return s.replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+function add(){
+  const el = document.getElementById("input");
+  const text = el.value.trim();
+  if (!text) { el.focus(); return; }
+  items.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    text,
+    type: document.getElementById("type").value,
+    status: "idea",
+    ts: Date.now()
+  });
+  el.value = "";
+  save(); render(); el.focus();
+}
+
+document.getElementById("add").addEventListener("click", add);
+document.getElementById("input").addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") add();
+});
+document.getElementById("filters").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  document.querySelectorAll(".chip").forEach(c => c.classList.remove("on"));
+  chip.classList.add("on");
+  filter = chip.dataset.f;
+  render();
+});
+document.getElementById("search").addEventListener("input", e => {
+  query = e.target.value;
+  render();
+});
+document.getElementById("list").addEventListener("click", e => {
+  const btn = e.target.closest(".act");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const act = btn.dataset.act;
+  if (act === "del") items = items.filter(x => x.id !== id);
+  else items = items.map(x => x.id === id ? { ...x, status: act } : x);
+  save(); render();
+});
+
+load(); render();
+</script>
+</body>
+</html>
